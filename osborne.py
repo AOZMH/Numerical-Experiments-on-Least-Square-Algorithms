@@ -26,6 +26,7 @@ class osborne(data_fit_func):
 
 
 def main():
+    import numpy as np
     initial_x = torch.tensor([1.3, 0.65, 0.65, 0.7, 0.6, 3, 5, 7, 2, 4.5, 5.5])
 
     initial_x = torch.tensor([1.3066, 0.4224, 0.6312, 0.5689, 0.7325, 0.9966, 1.2042, 5.4065, 2.3890,
@@ -49,6 +50,13 @@ def main():
             print(x)
         res.backward()
         x = x - 0.02 * x.grad
+
+        rk = osborne_inst(x)
+        Jk = osborne_inst.jacobian(x).detach()
+        cal_gk = np.dot(Jk.T, rk.clone().detach())
+        gk = osborne_inst.g_func(x).detach()
+        delta = np.linalg.norm(gk - cal_gk)
+        assert(delta < 1e-3), delta
     print(x)
 
 if __name__ == '__main__':

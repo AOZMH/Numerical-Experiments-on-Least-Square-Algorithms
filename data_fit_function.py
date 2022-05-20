@@ -1,5 +1,4 @@
 # Base data-fitting function class, define the naive implementation of its forward and jacobian matrix
-from functools import reduce
 import torch
 
 
@@ -40,6 +39,17 @@ class data_fit_func:
         self.j_calls += 1
         # x = torch.tensor(x), x must be tensor type as input
         return torch.autograd.functional.jacobian(self, x)
+    
+    def g_func(self, x):
+        # Gradient of objective function
+        # Input: x, an n-dim float vector
+        # Output: g(x), an n-dim float vector
+
+        tmp_x = x.clone().detach().requires_grad_()
+        #tmp_x.grad.zero_()
+        func_val = self(tmp_x, reduce=True)
+        func_val.backward()
+        return tmp_x.grad.clone().detach()
     
     def get_partial_alpha(self, xk, dk):
         # Get 1-dim function of a for line search
