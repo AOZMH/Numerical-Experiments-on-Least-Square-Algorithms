@@ -49,7 +49,7 @@ def dogleg_test(x0, dogleg_func, trial_name, num_data=65):
     print('{}\tfx* = {:.6f}\t|gx*| = {:.8f}\ttime = {:.6f}\tepochs = {}\t{}'.format(trial_name, f_star.item(), g_norm, elapsed_time, epochs, eval_info))
 
 
-def main_gauss_newton():
+def main_gauss_newton(noise=None):
     fib_search_inst = fib_searcher()
     x_scales = [8, 16, 32, 64, 128]
     x_scales = [65]
@@ -57,24 +57,26 @@ def main_gauss_newton():
         print('================= Scale of X is {} ================'.format(x_scale))
         # Initial value provided by Osborne
         x0 = torch.tensor([1.3, 0.65, 0.65, 0.7, 0.6, 3, 5, 7, 2, 4.5, 5.5])
-        #noise = torch.randn(len(x0))
-        #x0 = x0 + noise
+        if noise is not None:
+           x0 = x0 + noise
         gauss_newton_test(x0, False, fib_search_inst, 'Gauss Newton')
         gauss_newton_test(x0, True, fib_search_inst, 'Large Residual GN')
 
 
-def main_dogleg():
+def main_dogleg(noise=None):
     x_scales = [65]
     for x_scale in x_scales:
         print('================= Scale of X is {} ================'.format(x_scale))
         # Initial value provided by Osborne
         x0 = torch.tensor([1.3, 0.65, 0.65, 0.7, 0.6, 3, 5, 7, 2, 4.5, 5.5])
-        #noise = torch.randn(len(x0))
-        #x0 = x0 + noise
+        if noise is not None:
+           x0 = x0 + noise
         dogleg_test(x0, single_dogleg, 'Single Dogleg')
         dogleg_test(x0, double_dogleg, 'Double Dogleg')
 
 
 if __name__ == '__main__':
-    #main_gauss_newton()
-    main_dogleg()
+    noise = torch.randn(11) * 0.4
+    #noise = None
+    main_dogleg(noise)
+    main_gauss_newton(noise)

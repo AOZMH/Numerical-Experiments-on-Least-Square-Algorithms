@@ -23,8 +23,14 @@ def get_beta(dk_gn, gn_norm, dk_sd_ak, sd_norm, delta):
     beta1, beta2 = np.roots(coeff)
     if 0 <= beta1 <= 1:
         return beta1
+    elif 0 <= beta2 <= 1:
+        #assert(0 <= beta2 <= 1), (beta1, beta2, coeff)
+        return beta2
+    # If either, might be caused in the double-dogleg
+    # when eta is too small s.t. ||dk_gn_tilde|| < delta
+    if beta1 > 0:
+        return beta1
     else:
-        assert(0 <= beta2 <= 1), (beta1, beta2, coeff)
         return beta2
 
 
@@ -45,17 +51,33 @@ def single_dogleg(delta, Jk, gk):
         return (delta / sd_norm) * dk_sd_ak
     beta = get_beta(dk_gn, gn_norm, dk_sd_ak, sd_norm, delta)
     dk = (1 - beta) * dk_sd_ak + beta * dk_gn
-    print(delta, np.linalg.norm(dk))
+    #print(delta, np.linalg.norm(dk))
     return dk
 
 
-def double_dogleg(xk, func_inst, delta):
+def get_gamma_double_dogleg(gk, Jk, Gk_inv):
+    # Calculate the gamma in double dogleg
+    Jkgk = np.dot(Jk, gk)
+    lower = np.dot(Jkgk, Jkgk)
+    # Note that Gk_inv = (Jk^t*Jk)^-1
+    lower *= np.dot(gk, np.dot(Gk_inv, gk))
+    upper = np.dot(gk, gk) ** 2
+    return upper / lower
+
+
+def double_dogleg(delta, Jk, gk):
     # Double dogleg method
     Gk = np.matmul(Jk.T, Jk)
-    dk_gn = -np.dot(np.linalg.inv(Gk), gk)
+    Gk_inv = np.linalg.inv(Gk)
+    dk_gn = -np.dot(Gk_inv, gk)
     dk_sd = -gk
     ak = np.dot(gk, gk) / (np.linalg.norm(np.dot(Jk, gk)) ** 2)
     dk_sd_ak = ak * dk_sd
+
+    # Different from single dogleg, dk_gn_tilde is introduced
+    gamma = get_gamma_double_dogleg(gk, Jk, Gk_inv)
+    eta = 0.8 * gamma + 0.2     # Dennis & Mei's method
+    dk_gn_tilde = eta * dk_gn
     
     gn_norm = np.linalg.norm(dk_gn)
     sd_norm = np.linalg.norm(dk_sd_ak)
@@ -64,9 +86,9 @@ def double_dogleg(xk, func_inst, delta):
         return dk_gn
     if sd_norm >= delta:
         return (delta / sd_norm) * dk_sd_ak
-    beta = get_beta(dk_gn, gn_norm, dk_sd_ak, sd_norm, delta)
-    dk = (1 - beta) * dk_sd_ak + beta * dk_gn
-    print(delta, np.linalg.norm(dk))
+    beta = get_beta(dk_gn_tilde, eta * gn_norm, dk_sd_ak, sd_norm, delta)
+    dk = (1 - beta) * dk_sd_ak + beta * dk_gn_tilde
+    #print(delta, np.linalg.norm(dk))
     return dk
 
 
