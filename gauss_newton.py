@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 
 
 def gauss_newton_method(func_inst, x0, line_searcher, eps=1e-8, n_epochs=100, large_residual=False, verbose=False):
@@ -16,7 +17,7 @@ def gauss_newton_method(func_inst, x0, line_searcher, eps=1e-8, n_epochs=100, la
         rk = func_inst(xk)
         Jk = func_inst.jacobian(xk)
         gk = np.dot(Jk.T, rk)   # gk = Jk * rk
-        if np.linalg.norm(rk - last_rk) < eps and np.linalg.norm(gk) < eps:
+        if np.linalg.norm(rk - last_rk) < eps or np.linalg.norm(gk) < eps:
             break
 
         # dk = -(JkJk + Sk)^(-1)*(Jkrk)
@@ -27,9 +28,8 @@ def gauss_newton_method(func_inst, x0, line_searcher, eps=1e-8, n_epochs=100, la
                 # TODO 这里可以记录last_gk来优化，可以验证正确性
                 yk = np.dot(Jk.T, rk) - np.dot(last_Jk.T, last_rk)
                 yk_hat = np.dot((Jk - last_Jk).T, rk)
-                Gk += update_Bk(Bk, sk, yk, yk_hat)
-            else:
-                Gk += Bk
+                Bk = update_Bk(Bk, sk, yk, yk_hat)
+            Gk += Bk
         dk = -np.dot(np.linalg.inv(Gk), gk)
 
         # line search for alpha_k
@@ -47,7 +47,8 @@ def gauss_newton_method(func_inst, x0, line_searcher, eps=1e-8, n_epochs=100, la
         last_Jk = Jk
         xk = xk + ak * dk
         if verbose:
-            print('[{}] rk={:.5f}, |gk|={:.8f}'.format(epoch, rk, np.linalg.norm(gk)))
+            fval = torch.sum(rk ** 2) / 2
+            print('[{}] rk={:.8f}, |gk|={:.8f}'.format(epoch, fval.item(), np.linalg.norm(gk)))
     return xk, epoch
 
 
@@ -55,4 +56,8 @@ def update_Bk(Bk, sk, yk, yk_hat):
     # Updating function for Bk, the simulation of Sk
     yksk = np.dot(yk, sk)
     yk_hat_Bksk = yk_hat - np.dot(Bk, sk)
-    # TODO reshape构造矩阵
+
+    upper1 = np.matmul(yk_hat_Bksk.reshape(-1, 1), yk.reshape(1, -1)) + np.matmul(yk.reshape(-1, 1), yk_hat_Bksk.reshape(1, -1))
+    upper2 = np.dot(yk_hat_Bksk, sk) * np.matmul(yk.reshape(-1, 1), yk.reshape(1, -1))
+    
+    return Bk + upper1 / yksk - upper2 / (yksk ** 2)

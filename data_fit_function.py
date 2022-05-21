@@ -23,7 +23,7 @@ class data_fit_func:
         # Input: x, an n-dim float vector
         # Output: r(x), an m-dim float vector if reduce=False; else the float square sum of all residuals
         self.func_calls += 1
-        residuals = torch.tensor([], requires_grad=True)
+        residuals = torch.tensor([])
         for cur_t, cur_y in zip(self.t_data, self.y_data):
             ri = self.cal_residual(cur_t, cur_y, x).unsqueeze(0)
             residuals = torch.cat((residuals, ri), dim=0)
