@@ -11,8 +11,8 @@ class osborne(data_fit_func):
         # Initialize calling counts
         super(osborne, self).__init__()
         # Setup data points
-        self.t_data = t_data
-        self.y_data = y_data
+        self.t_data = torch.tensor(t_data)
+        self.y_data = torch.tensor(y_data)
     
     def cal_residual(self, t, y, x):
         # Residual on a specific data point <t, y>
@@ -38,7 +38,10 @@ def main():
     osborne_inst = osborne(t_data, y_data)
     print(osborne_inst(initial_x).tolist())
     print(osborne_inst(initial_x, reduce=True))
+    import time
+    t0 = time.time()
     print(osborne_inst.jacobian(initial_x).shape)
+    print('time: ', time.time() - t0)
 
     x = initial_x
     for epoch in range(6000):

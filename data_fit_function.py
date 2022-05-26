@@ -18,13 +18,15 @@ class data_fit_func:
         # Residual on a specific data point <t, y>, to be implemented in child classes
         raise NotImplementedError
 
-    def __call__(self, x, reduce=False):
+    def __call__(self, x, d=None, reduce=False):
         # Calculate r(x)
         # Input: x, an n-dim float vector
+        #        d, an m-dim float vector to denote error
         # Output: r(x), an m-dim float vector if reduce=False; else the float square sum of all residuals
         self.func_calls += 1
+        t_data = self.t_data + d if d is not None else self.t_data
         residuals = torch.tensor([])
-        for cur_t, cur_y in zip(self.t_data, self.y_data):
+        for cur_t, cur_y in zip(t_data, self.y_data):
             ri = self.cal_residual(cur_t, cur_y, x).unsqueeze(0)
             residuals = torch.cat((residuals, ri), dim=0)
         if not reduce:
@@ -35,7 +37,7 @@ class data_fit_func:
     def jacobian(self, x):
         # Calculate the Jacobian matrix as parameter "x"
         # Input: x, an n-dim float vector (of tensor type)
-        # Output: J(x), an <n, m>-dim float matrix (m denote the number of residual functions)
+        # Output: J(x), an <m, n>-dim float matrix (m denote the number of residual functions)
         self.j_calls += 1
         # x = torch.tensor(x), x must be tensor type as input
         return torch.autograd.functional.jacobian(self, x)

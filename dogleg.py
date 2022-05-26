@@ -9,7 +9,7 @@ def cal_delta_qk(dk, Jk, rk):
     Jkdk = np.dot(Jk, dk)
     val1 = np.dot(Jkdk, Jkdk) / 2
     val2 = np.dot(rk, Jkdk)
-    return - val1 / 2 - val2
+    return - val1 - val2
 
 
 def get_beta(dk_gn, gn_norm, dk_sd_ak, sd_norm, delta):

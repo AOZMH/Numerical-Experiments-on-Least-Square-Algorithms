@@ -1,3 +1,4 @@
+from distutils.log import error
 import time
 import numpy as np
 import torch
@@ -6,6 +7,8 @@ from osborne import osborne
 from line_search import fib_searcher, gll_searcher
 from gauss_newton import gauss_newton_method
 from dogleg import trust_region_method, single_dogleg, double_dogleg
+from odr_algo import odr_trust_region_method
+from orthogonal_distance_regression import odr_func
 
 
 def get_osborne_instance(num_data=65):
@@ -49,6 +52,23 @@ def dogleg_test(x0, dogleg_func, trial_name, num_data=65):
     print('{}\tfx* = {:.6f}\t|gx*| = {:.8f}\ttime = {:.6f}\tepochs = {}\t{}'.format(trial_name, f_star.item(), g_norm, elapsed_time, epochs, eval_info))
 
 
+def odr_test(x0, error0, dogleg_func, trial_name, num_data=65):
+    # test odr methods
+    osborne_inst = get_osborne_instance(num_data)
+    func_inst = odr_func(osborne_inst)
+    t0 = time.time()
+    x_star, errork, epochs = odr_trust_region_method(func_inst, x0, error0, eps=1e-6, dogleg_func=dogleg_func, verbose=True)
+    
+    # output statistics
+    elapsed_time = time.time() - t0
+    eval_info = func_inst.data_fit_inst.get_eval_infos()   # NOTE this must be called before the final evaluation of x*
+    f_star = func_inst(x_star, errork, reduce=True)
+    g_star = func_inst.g_func(x_star, errork)
+    g_norm = np.linalg.norm(g_star)
+
+    print('{}\tfx* = {:.6f}\t|gx*| = {:.8f}\ttime = {:.6f}\tepochs = {}\t{}'.format(trial_name, f_star.item(), g_norm, elapsed_time, epochs, eval_info))
+
+
 def main_gauss_newton(noise=None):
     fib_search_inst = fib_searcher()
     x_scales = [8, 16, 32, 64, 128]
@@ -75,8 +95,23 @@ def main_dogleg(noise=None):
         dogleg_test(x0, double_dogleg, 'Double Dogleg')
 
 
+def main_odr(noise=None):
+    x_scales = [65]
+    for x_scale in x_scales:
+        print('================= Scale of X is {} ================'.format(x_scale))
+        # Initial value provided by Osborne
+        x0 = torch.tensor([1.3, 0.65, 0.65, 0.7, 0.6, 3, 5, 7, 2, 4.5, 5.5])
+        error0 = torch.randn(x_scale) * 0.3
+        error0 = torch.zeros(x_scale)
+        if noise is not None:
+           x0 = x0 + noise
+        odr_test(x0, error0, single_dogleg, 'ODR Single Dogleg')
+        odr_test(x0, error0, double_dogleg, 'ODR Double Dogleg')
+
+
 if __name__ == '__main__':
     noise = torch.randn(11) * 0.4
-    #noise = None
+    noise = None
     main_dogleg(noise)
     main_gauss_newton(noise)
+    main_odr(noise)

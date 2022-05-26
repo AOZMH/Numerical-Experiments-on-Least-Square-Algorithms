@@ -25,7 +25,7 @@ class odr_func:
         else:
             return torch.sum(residuals ** 2) / 2
     
-    def jacobian(self, x, d):
+    def jacobian_baseline(self, x, d):
         # Calculate the Jacobian matrix as parameter "<x, d>"
         # Input: x, an n-dim float vector (of tensor type)
         #        d, an m-dim float vector (of tensor type)
@@ -40,6 +40,7 @@ class odr_func:
         # Input: x, an n-dim float vector (of tensor type)
         #        d, an m-dim float vector (of tensor type)
         # Output: J(x), an <2*m, n+m>-dim float matrix (m denote the number of residual functions)
+        self.data_fit_inst.j_calls += 1
         grad_main = torch.autograd.functional.jacobian(self.data_fit_inst, (x, d))
         # <m, n+m>
         jacob_upper = torch.cat(grad_main, dim=1)
@@ -51,6 +52,22 @@ class odr_func:
         jacob_lower = torch.cat((grad_zero, grad_diag), dim=1)
         jacob = torch.cat((jacob_upper, jacob_lower), dim=0)
         return jacob
+    
+    def jacobian(self, x, d):
+        # Wrapper
+        return self.jacobian_opt(x, d)
+    
+    def g_func(self, x, d):
+        # Gradient of objective function
+        # Input: x, an n-dim float vector
+        #        d, an m-dim float vector
+        # Output: g(x), an n-dim float vector
+
+        tmp_x = x.clone().detach().requires_grad_()
+        #tmp_x.grad.zero_()
+        func_val = self(tmp_x, d, reduce=True)
+        func_val.backward()
+        return tmp_x.grad.clone().detach()
 
 
 def main():

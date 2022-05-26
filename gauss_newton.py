@@ -30,7 +30,10 @@ def gauss_newton_method(func_inst, x0, line_searcher, eps=1e-8, n_epochs=100, la
                 yk_hat = np.dot((Jk - last_Jk).T, rk)
                 Bk = update_Bk(Bk, sk, yk, yk_hat)
             Gk += Bk
-        dk = -np.dot(np.linalg.inv(Gk), gk)
+        try:
+            dk = -np.dot(np.linalg.inv(Gk), gk)
+        except np.linalg.LinAlgError:
+            dk = -gk
 
         # line search for alpha_k
         partial_func = func_inst.get_partial_alpha(xk, dk)
