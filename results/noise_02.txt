@@ -1,0 +1,6 @@
+Single Dogleg   fx* = 0.020069  |gx*| = 0.00000101      time = 19.520445        epochs = 13     feval = 27      Jeval = 13
+Double Dogleg   fx* = 0.020069  |gx*| = 0.00000106      time = 19.224502        epochs = 13     feval = 27      Jeval = 13
+Gauss Newton    fx* = 0.020069  |gx*| = 0.00000735      time = 54.788108        epochs = 33     feval = 899     Jeval = 34
+Large Residual GN       fx* = 0.020069  |gx*| = 0.00000063      time = 45.311565        epochs = 26     feval = 832     Jeval = 27
+ODR Single Dogleg       fx* = 0.016710  |gx*| = 0.00000207      time = 20.587406        epochs = 15     feval = 30      Jeval = 14
+ODR Double Dogleg       fx* = 0.016710  |gx*| = 0.00000175      time = 22.262022        epochs = 16     feval = 32      Jeval = 15
