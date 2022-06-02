@@ -104,6 +104,16 @@
   \label{fig:osborne}
 \end{figure}
 
+\subsection{实现的算法}
+
+\subsubsection{大剩余量与小剩余量Gauss-Newton方法}
+为比较小剩余与大剩余量方法，本文基于Gauss-Newton方法，每步利用$(J_k^t J_k + B_k) d_k = -J_k^t r_k$求参数更新方向，然后利用Fibonacci法进行精确线搜索确定更新量。对于小剩余量方法，令$B_k=0$；对于大剩余量方法，通过$B_{k+1} = B_k + \frac{(y_k-B_k s_k)y_k^t+y_k{(y_k-B_k s_k)}^t}{y_k^t s_k} - \frac{{(y_k-B_k s_k)}^t s_k}{{y_k^t s_k}^2}y_k y_k^t$逐步计算二阶项，注意这一公式与教材相同。
+
+\subsubsection{单折与双折Dogleg方法}
+Dogleg方法是求解信赖域子问题的一种方法，首先我们利用信赖域算法求解最小二乘问题，每步更新信赖域半径$\Delta_k$，Dogleg方法则是一种在信赖域内寻找$d_k$的方法。具体地，单折Dogleg利用$d_k^{SD}$和$d_k^{GN}$选择$d_k$，双折Dogleg则进一步引入$\eta_k d_k^{GN}$优化$d_k$的选择。二者的具体算法与教材中相同，这里不再赘述。
+
+\subsubsection{ODR方法}
+
 \subsection{共轭梯度法}
 本实验实现基于FR与PRP两种$\beta_k$更新公式的共轭梯度方法，具体实现与教材中完全相同，这里不再赘述。
 
