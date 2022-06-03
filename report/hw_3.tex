@@ -113,189 +113,86 @@
 Dogleg方法是求解信赖域子问题的一种方法，首先我们利用信赖域算法求解最小二乘问题，每步更新信赖域半径$\Delta_k$，Dogleg方法则是一种在信赖域内寻找$d_k$的方法。具体地，单折Dogleg利用$d_k^{SD}$和$d_k^{GN}$选择$d_k$，双折Dogleg则进一步引入$\eta_k d_k^{GN}$优化$d_k$的选择。二者的具体算法与教材中相同，这里不再赘述。
 
 \subsubsection{ODR方法}
-
-\subsection{共轭梯度法}
-本实验实现基于FR与PRP两种$\beta_k$更新公式的共轭梯度方法，具体实现与教材中完全相同，这里不再赘述。
-
-\subsection{三项方法}
-共轭梯度法实际上是一种二项的梯度型方法，为提升求解精度，Beale-Powell提出了一种包含三项的方向更新公式，本实验实现了这一方法。此算法基于如下更新公式：
-\[ \beta_k = g_k^T [g_k - g_{k-1}] / d_{k-1}^T [g_k - g_{k-1}] \]
-\[ \gamma_k = g_k^T [g_{t+1} - g_t] / d_t^T [g_{t+1} - g_t] \]
-\[ d_k = -g_k + \beta_k d_{k-1} + \gamma_k d_{t} \]
-
-此外，当更新方向不够好时，使用restart的方法更新t=k-1，并设置$\gamma_k=0$（即使用二项公式更新）。存在如下三种restart条件：1)当$g_k^T g_{k-1} \geq 0.2 ||g_k||^2$时，梯度正交性不足，设置重新开始；2)当$k-t\geq n$时，所有理想共轭方向已经用过了，重新开始；3)求出上述$d_k$后，若$-1.2||g_k||^2\leq d_k^T g_k\leq -0.8||g_k||^2$不满足，则重新开始，并重新舍弃第三项计算$d_k$。
+ODR方法是对最小二乘问题框架的一种扩展，在原始最小二乘问题中，我们最小化剩余函数的平方和，即样本点到拟合曲线的纵轴距离的平方和；对于ODR方法，它考虑样本点可能存在横轴误差，因此最小化样本点到拟合曲线的垂直距离平方和：
+\[ \min_{x,\delta} \sum\limits_{i=1}^n \{{(y_i-f(t_i+\delta_i;x))}^2 + \delta_i^2\} \]
+注意这一问题可进一步被化为具有2n个剩余函数的最小二乘问题，其中$r_i(x,\delta)=y_i-f(t_i+\delta_i;x), 0\leq i\leq n; r_i(x,\delta)=\delta_i, n+1\leq i\leq 2n$。这样一来，即可使用最小二乘算法求解ODR问题，具体地，Boggs1985使用信赖域方法求解，可以利用Dogleg方法求解信赖域子问题。此外，还需注意将ODR化为最小二乘问题后其Jacobi矩阵的右上角、右下角子矩阵均为对角矩阵，其左下角子矩阵为0，因此可以提高其计算效率，本文所进行的实验也加入了这一效率优化。
 
 
 \section{实验结果}
-本节分别在三个测试函数上比较各方法的实验效果。在实验中，均使用20次迭代的Fibonacci搜索进行精确线搜索；作为基准方法，我们同时与基于Cholesky分解的修正Newton方法、BFGS拟Newton方法进行比较。
-
-\subsection{Ackley函数上的实验}
-表\ref{tab:ackley}总结了上述方法在Ackley函数上的结果。对此可做如下分析：
-\begin{itemize}
-  \item 对比拟Newton方法和共轭梯度类方法，可以发现前者总体优于后者。所有拟Newton方法在所有规模下均实现收敛，而三类共轭梯度类方法常常无法收敛，达到最大循环次数退出。虽然后者的一阶性具有更高性能，但由于收敛性不佳，往往耗费更多迭代次数，这反而影响了它的效率。
-  \item 共轭梯度类方法在正定二次函数中具有很好的理论表现，但在此处实际表现不佳，说明了实际问题的复杂性，我们通常不能期望在一小类问题上具有良好理论基础的方法总是具有很好的泛化能力，实际上，共轭梯度法并不比拟Newton法更通用。
-  \item 在拟Newton方法中，L-BFGS相比BFGS具有更优的数值表现，这体现在它具有更快的运行速度。二者虽然总迭代次数相仿（L-BFGS有时反而更多），但舍弃Hessian矩阵的存储使L-BFGS效率更高，总体运行时间显著低于BFGS。
-  \item 在共轭梯度类方法中，首先PRP方法显著优于FR方法，这体现在FR方法最终退出时$g^*$往往处在1e-1量级，这通常是不可接受的；作为对比，PRP虽经常无法达到$\epsilon$精度，但也有1e-6的精度，可以接受。在正定二次函数中，PRP与FR等价；但在我们的实际应用中，二者性能差别很大，这说明最优化方法往往需要更多的实践分析。
-  \item 其次，Beale-Powell三项方法虽属于对PRP的改进，但在Ackley函数上体现的数值表现差别并不明显，它在多数情况下能取得比PRP更优的精度，但此时需要消耗更多的CPU时间，实际中需权衡时间效率与精度选择两算法。
-\end{itemize}
+本节比较上述算法的数值表现，我将分别对比分析单折与双折Dogleg方法的表现、大/小剩余量Gauss-Newton方法的表现、ODR方法的表现。在实验中，默认初始值使用Osborne问题提供的初始参数（见图\ref{fig:osborne}），Gauss-Newton类方法均使用20次迭代的Fibonacci搜索进行精确线搜索，ODR方法初始化误差项$\delta=0$。在上述默认设定下，所有方法的表现如表\ref{tab:overall}所示。
 
 \begin{table*}[h]
   \centering
-  \begin{tabular}{c l c c c c c c c}
+  \begin{tabular}{l c c c c c c}
     \toprule
-    \bfseries n & \bfseries Methods & \boldmath{$f(x^*)$} & \boldmath $||g(x^*)||$ & \bfseries Time(s) & \bfseries niter & \bfseries feval & \bfseries geval & \bfseries Geval \\
-    \cmidrule(lr){1-9}
-    \multirow{5}{*}{100} &
-    BFGS & 3.8710 & $<\epsilon$ & 0.0928 & 38 & 77 & 39 & 0 \\
-    & L-BFGS & 3.9730 & $<\epsilon$ & 0.0509 & 22 & 46 & 23 & 0 \\
-    & FR & 5.0915 & 6e-1 & 0.3900 & 300 & 1376 & 300 & 0 \\
-    & PRP & 5.7260 & 3e-7 & 0.2344 & 300 & 600 & 300 & 0 \\
-    & BP & 5.7260 & 3e-7 & 0.2663 & 300 & 600 & 300 & 0 \\
-    \cmidrule(lr){1-9}
-    \multirow{5}{*}{200} &
-    BFGS & 6.0790 & $<\epsilon$ & 0.0844 & 27 & 57 & 28 & 0 \\
-    & L-BFGS & 6.0790 & $<\epsilon$ & 0.0419 & 26 & 55 & 27 & 0 \\
-    & FR & 5.4226 & 5e-1 & 0.2970 & 300 & 1162 & 300 & 0 \\
-    & PRP & 6.1057 & 6e-7 & 0.1865 & 300 & 600 & 300 & 0 \\
-    & BP & 6.1057 & 3e-7 & 0.2327 & 300 & 600 & 300 & 0 \\
-    \cmidrule(lr){1-9}
-    \multirow{5}{*}{300} &
-    BFGS & 6.5189 & $<\epsilon$ & 0.2682 & 34 & 69 & 35 & 0 \\
-    & L-BFGS & 6.5189 & $<\epsilon$ & 0.0549 & 33 & 67 & 34 & 0 \\
-    & FR & 6.3083 & 3e-1 & 0.2473 & 300 & 950 & 300 & 0 \\
-    & PRP & 6.5730 & 2e-6 & 0.7405 & 300 & 1326 & 300 & 0 \\
-    & BP & 6.5730 & 3e-6 & 0.4181 & 300 & 1324 & 300 & 0 \\
-    \cmidrule(lr){1-9}
-    \multirow{5}{*}{400} &
-    BFGS & 5.8927 & $<\epsilon$ & 0.5834 & 45 & 94 & 46 & 0 \\
-    & L-BFGS & 5.8827 & $<\epsilon$ & 0.0959 & 44 & 92 & 45 & 0 \\
-    & FR & 6.0529 & 3e-1 & 0.3042 & 300 & 971 & 300 & 0 \\
-    & PRP & 6.3071 & 7e-7 & 0.2174 & 300 & 600 & 300 & 0 \\
-    & BP & 5.9703 & 8e-7 & 0.2352 & 300 & 600 & 300 & 0 \\
-    \cmidrule(lr){1-9}
-    \multirow{5}{*}{500} &
-    BFGS & 6.3447 & $<\epsilon$ & 0.7310 & 33 & 67 & 34 & 0 \\
-    & L-BFGS & 6.3447 & $<\epsilon$ & 0.0798 & 44 & 89 & 45 & 0 \\
-    & FR & 6.4770 & 3e-1 & 0.2882 & 300 & 1080 & 300 & 0 \\
-    & PRP & 6.3518 & 2e-5 & 0.5008 & 300 & 2325 & 300 & 0 \\
-    & BP & 6.3146 & 9e-6 & 0.2424 & 300 & 601 & 300 & 0 \\
+    \bfseries Methods & \boldmath{$f(x^*)$} & \boldmath $||g(x^*)||$ & \bfseries Time(s) & \bfseries niter & \bfseries feval & \bfseries Jeval\\
+    \cmidrule(lr){1-7}
+    Single-Dogleg & 0.020069 & $<\epsilon$ & 12.8715 & 12 & 25 & 12 \\
+    Double-Dogleg & 0.020069 & $<\epsilon$ & 9.7732 & 12 & 25 & 12 \\
+    \cmidrule(lr){1-7}
+    GN-Small & 0.020069 & 6.14e-5 & 12.0391 & 13 & 346 & 13 \\
+    GN-Large & 0.020069 & $<\epsilon$ & 26.5562 & 28 & 859 & 28 \\
+    \cmidrule(lr){1-7}
+    ODR-Single & 0.016710 & $<\epsilon$ & 15.6048 & 16 & 33 & 16 \\
+    ODR-Double & 0.016710 & $<\epsilon$ & 14.5138 & 16 & 33 & 16 \\
     \bottomrule
   \end{tabular}
-  \caption{各类方法在Ackley函数上的比较。所有算法均使用Fibonacci法进行精确线搜索。表中BP指基于Beale-Powell restart的三项方法，其余方法见前述介绍；Time指CPU时间，niter为迭代轮数，feval、geval和Geval分别指愿函数、一阶导数及hessian矩阵的计算次数。$\epsilon=1e-8$。}
-  \label{tab:ackley}
+  \caption{各类方法在Osborne问题上的数值表现。表中GN-Small指小剩余量的Gauss-Newton方法，GN-Large指大剩余量的Gauss-Newton方法，ODR-Single指基于单折Dogleg求解ODR问题的算法，ODR-Double指基于双折Dogleg求解ODR问题的算法；Time指CPU时间，niter为迭代轮数，feval分别Jeval分别指剩余函数（向量）和最小二乘问题的Jacobi矩阵的计算次数，$||g^*||$为所有最小二乘目标函数在收敛点的导数范数。$\epsilon=1e-6$。}
+  \label{tab:overall}
 \end{table*}
 
-\begin{table*}[t]
-  \centering
-  \begin{tabular}{c l c c c c c c c}
-    \toprule
-    \bfseries n & \bfseries Methods & \boldmath{$f(x^*)$} & \boldmath $||g(x^*)||$ & \bfseries Time(s) & \bfseries niter & \bfseries feval & \bfseries geval & \bfseries Geval \\
-    \cmidrule(lr){1-9}
-    \multirow{5}{*}{100} &
-    BFGS & 0.0000 & $<\epsilon$ & 0.1379 & 32 & 98 & 33 & 0 \\
-    & L-BFGS & 0.0000 & $<\epsilon$ & 0.1554 & 32 & 98 & 33 & 0 \\
-    & FR & 0.0632 & 2e-1 & 0.7446 & 300 & 2109 & 300 & 0 \\
-    & PRP & 8.9937 & 9e-2 & 0.6406 & 300 & 300 & 300 & 0 \\
-    & BP & 10.2864 & 1e-1 & 0.7512 & 300 & 300 & 300 & 0 \\
-    \cmidrule(lr){1-9}
-    \multirow{5}{*}{200} &
-    BFGS & 0.0000 & $<\epsilon$ & 0.1809 & 43 & 131 & 44 & 0 \\
-    & L-BFGS & 0.0000 & $<\epsilon$ & 0.1047 & 44 & 134 & 45 & 0 \\
-    & FR & 0.4132 & 6e-1 & 1.4345 & 300 & 2555 & 300 & 0 \\
-    & PRP & 16.0523 & 1e-1 & 0.2713 & 300 & 900 & 300 & 0 \\
-    & BP & 18.4863 & 1e-1 & 0.5484 & 300 & 900 & 300 & 0 \\
-    \cmidrule(lr){1-9}
-    \multirow{5}{*}{300} &
-    BFGS & 0.0000 & $<\epsilon$ & 1.0055 & 47 & 143 & 48 & 0 \\
-    & L-BFGS & 0.0000 & $<\epsilon$ & 0.2038 & 51 & 155 & 52 & 0 \\
-    & FR & 0.4090 & 7e-1 & 0.9568 & 300 & 2515 & 300 & 0 \\
-    & PRP & 21.4195 & 1e-1 & 0.4876 & 300 & 900 & 300 & 0 \\
-    & BP & 24.7214 & 1e-1 & 0.7672 & 300 & 900 & 300 & 0 \\
-    \cmidrule(lr){1-9}
-    \multirow{5}{*}{400} &
-    BFGS & 0.0000 & $<\epsilon$ & 1.7973 & 53 & 161 & 54 & 0 \\
-    & L-BFGS & 0.0000 & $<\epsilon$ & 0.3073 & 59 & 179 & 60 & 0 \\
-    & FR & 0.4548 & 7e-1 & 1.2051 & 300 & 2437 & 300 & 0 \\
-    & PRP & 31.4980 & 2e-1 & 0.5822 & 300 & 900 & 300 & 0 \\
-    & BP & 36.4296 & 2e-1 & 0.7491 & 300 & 900 & 300 & 0 \\
-    \cmidrule(lr){1-9}
-    \multirow{5}{*}{500} &
-    BFGS & 0.0000 & $<\epsilon$ & 3.0199 & 59 & 179 & 60 & 0 \\
-    & L-BFGS & 0.0000 & $<\epsilon$ & 0.3536 & 62 & 188 & 63 & 0 \\
-    & FR & 0.6047 & 7e-1 & 1.1978 & 300 & 2030 & 300 & 0 \\
-    & PRP & 36.9223 & 2e-1 & 0.9250 & 300 & 900 & 300 & 0 \\
-    & BP & 42.7311 & 2e-1 & 0.9682 & 300 & 900 & 300 & 0 \\
-    \bottomrule
-  \end{tabular}
-  \caption{各类方法在Griewank函数上的比较。所有算法均使用Fibonacci法进行精确线搜索。表中BP指基于Beale-Powell restart的三项方法，其余方法见前述介绍；Time指CPU时间，niter为迭代轮数，feval、geval和Geval分别指愿函数、一阶导数及hessian矩阵的计算次数。$\epsilon=1e-8$。}
-  \label{tab:griewank}
-\end{table*}
+\subsection{单折与双折Dogleg对比}
 
-\subsection{Griewank函数上的实验}
-上述方法在Griewank上的实验结果如表\ref{tab:griewank}所示，我们做出如下分析：
+首先比较两种Dogleg方法的表现，如表\ref{tab:overall}的第1和2行所示，可做如下分析：
 \begin{itemize}
-  \item Griewank上的结果基本与Ackley上的情形类似，拟Newton方法普遍优于共轭梯度类方法，前者可以实现$\epsilon$一下的收敛，后者不可。此外，在拟Newton方法内部，随着问题规模增大，L-BFGS相比BFGS的性能优势逐渐增大，在n=500的规模上L-BFGS相比BFGS可加速近10倍。
-  \item 在共轭梯度类方法内部，PRP和BP相比FR收敛精度更好，这体现在更小的$||g^*||$；然而，FR方法最终可收敛到相对更小函数值$f^*$，即找到更好地局部极值点。
-  \item 对比PRP与BP方法，二者收敛精度类似，但PRP始终比BP略好一点，这说明BP虽作为PRP的改进，但未必在所有情形中均可优于PRP方法。
+  \item 二者均能较好地收敛至Osborne问题的全局最优点，与之对应的是线搜索型算法（表\ref{tab:overall}的第3和4行）收敛的精度不及这二者或速度显著慢于这二者，这展现了信赖域型方法在最小二乘问题上的有效性。
+  \item 在解信赖域子问题时，双折Dogleg法的表现优于单折Dogleg，在收敛到同样精度的前提下，双折所用的时间显著低于单折，这说明更精细的$d_k$选择逻辑帮助算法更好地收敛，展现了双折Dogleg改进的有效性。
 \end{itemize}
 
-\subsection{Rastrigin函数上的实验}
-在Rastrigin函数上的结果如表\ref{tab:rastrigin}所示，分析如下：
-\begin{itemize}
-  \item 拟Newton方法与共轭梯度类方法的对比与之前相似，前者精度仍显著高于后者；但在此函数上拟Newton方法往往需要更多的迭代次数才能收敛，这使其CPU时间更长，效率总体不佳；然而考虑到共轭梯度法收敛精度不佳，我们并不能断定拟Newton法在Rastrigin上具有劣势。
-  \item 在拟Newton方法中，BFGS的收敛精度高于L-BFGS，这与前文的结论不同，说明L-BFGS也并非总是优于BFGS。然而，L-BFGS往往能收敛至相比BFGS更小的函数值，这可能是由于在迭代初期它的更新步长以估算为主，偏向于梯度方向进而更快的向原点变化，而非很快地接近局部极小值，进而最终收敛于更靠近原点、函数值更小的局部极小值。
-  \item 在共轭梯度类方法中，BP方法收敛精度$||g^*||$显著高于其他两种方法，体现了其改进的优势，但总体而言共轭梯度类方法精度仍不理想。
-\end{itemize}
+\subsection{大/小剩余量方法对比}
+如表\ref{tab:overall}的第3和4行所示，基于Gauss-Newton方法的大、小剩余量方法表现不如基于Dogleg的信赖域型方法。此外，在默认初始点进行数值实验时，小剩余量方法很难达到所需的精度，但大剩余量方法需要更多的迭代次数进而耗时显著更高，因此表\ref{tab:overall}很难直接反映大、小剩余量方法的优劣。
 
-\begin{table*}[t]
+值得注意的是，大剩余量方法的提出是针对$x$距离$x^*$较远或剩余函数非线性程度较高的情况，这提示我们或许在默认初始点增加不同幅度的噪声多次运行算法（进而拟合剩余量逐步增大的情况），有助于更好地考察大剩余量相比小剩余量方法的不同。因此，我们在图\ref{fig:osborne}所给的初始值基础上，从不同标准差、期望为0的正态分布中采样随机噪声加入初始值，分别运行大、小剩余量算法，所得结果如表\ref{tab:noise}所示。
+
+\begin{table*}[h]
   \centering
-  \begin{tabular}{c l c c c c c c c}
+  \begin{tabular}{c l c c c c c c}
     \toprule
-    \bfseries n & \bfseries Methods & \boldmath{$f(x^*)$} & \boldmath $||g(x^*)||$ & \bfseries Time(s) & \bfseries niter & \bfseries feval & \bfseries geval & \bfseries Geval \\
-    \cmidrule(lr){1-9}
-    \multirow{5}{*}{100} &
-    BFGS & 661.6343 & $<\epsilon$ & 0.5457 & 201 & 1349 & 202 & 0 \\
-    & L-BFGS & 414.8923 & 6e-6 & 12.4202 & 2000 & 20734 & 2000 & 0 \\
-    & FR & 215.4769 & 1e2 & 0.7437 & 300 & 4059 & 300 & 0 \\
-    & PRP & 435.7878 & 1e-1 & 0.7899 & 300 & 4974 & 300 & 0 \\
-    & BP & 365.1468 & 1e-2 & 0.5958 & 300 & 3179 & 300 & 0 \\
-    \cmidrule(lr){1-9}
-    \multirow{5}{*}{200} &
-    BFGS & 1198.9077 & $<\epsilon$ & 1.1925 & 324 & 2329 & 325 & 0 \\
-    & L-BFGS & 889.4847 & 1e-5 & 9.0090 & 2000 & 21931 & 2000 & 0 \\
-    & FR & 563.6295 & 2e2 & 0.8198 & 300 & 4278 & 300 & 0 \\
-    & PRP & 781.0367 & 2e-1 & 0.7929 & 300 & 4719 & 300 & 0 \\
-    & BP & 706.4160 & 4e-1 & 0.6663 & 300 & 3145 & 300 & 0 \\
-    \cmidrule(lr){1-9}
-    \multirow{5}{*}{300} &
-    BFGS & 1820.6969 & $<\epsilon$ & 8.7206 & 429 & 2997 & 430 & 0 \\
-    & L-BFGS & 1300.3976 & 2e-5 & 12.7279 & 2000 & 22577 & 2000 & 0 \\
-    & FR & 1133.5034 & 4e2 & 2.6154 & 300 & 4213 & 300 & 0 \\
-    & PRP & 861.6311 & 5e-1 & 2.3425 & 300 & 5940 & 300 & 0 \\
-    & BP & 1117.3306 & 4e-1 & 1.6367 & 300 & 3146 & 300 & 0 \\
-    \cmidrule(lr){1-9}
-    \multirow{5}{*}{400} &
-    BFGS & 2010.7760 & $<\epsilon$ & 9.7254 & 495 & 3454 & 496 & 0 \\
-    & L-BFGS & 2097.3385 & 2e-5 & 11.3404 & 2000 & 21159 & 2000 & 0 \\
-    & FR & 1876.4243 & 6e2 & 1.2880 & 300 & 4163 & 300 & 0 \\
-    & PRP & 2120.4749 & 5e1 & 1.0073 & 300 & 3395 & 300 & 0 \\
-    & BP & 1755.0962 & 5e-1 & 1.1807 & 300 & 3160 & 300 & 0 \\
-    \cmidrule(lr){1-9}
-    \multirow{5}{*}{500} &
-    BFGS & 2447.5556 & 1e-6 & 15.2244 & 499 & 3738 & 500 & 0 \\
-    & L-BFGS & 1867.5232 & 2e-5 & 9.7453 & 2000 & 20747 & 2000 & 0 \\
-    & FR & 2295.3027 & 6e2 & 0.6888 & 300 & 4156 & 300 & 0 \\
-    & PRP & 3119.1587 & 5e-1 & 0.7628 & 300 & 4636 & 300 & 0 \\
-    & BP & 1945.1230 & 5e-1 & 0.8665 & 300 & 3175 & 300 & 0 \\
+    \bfseries Noise Scale & \bfseries Methods & \boldmath{$f(x^*)$} & \boldmath $||g(x^*)||$ & \bfseries Time(s) & \bfseries niter & \bfseries feval & \bfseries Jeval\\
+    \cmidrule(lr){1-8}
+    \multirow{2}{*}{0.0} &
+    GN-Small & 0.020069 & 6.14e-5 & 12.0391 & 13 & 346 & 13 \\
+    & GN-Large & 0.020069 & $<\epsilon$ & 26.5562 & 28 & 859 & 28 \\
+    \cmidrule(lr){1-8}
+    \multirow{2}{*}{0.2} &
+    GN-Small & 0.020069 & 7.35e-6 & 54.7881 & 34 & 899 & 34 \\
+    & GN-Large & 0.020069 & $<\epsilon$ & 45.3116 & 27 & 832 & 27 \\
+    \cmidrule(lr){1-8}
+    \multirow{2}{*}{0.4} &
+    GN-Small & 0.020069 & 1.56e-5 & 105.186 & 57 & 1528 & 57 \\
+    & GN-Large & 0.020069 & $<\epsilon$ & 55.1325 & 30 & 935 & 30 \\
     \bottomrule
   \end{tabular}
-  \caption{各类方法在Rastrigin函数上的比较。所有算法均使用Fibonacci法进行精确线搜索。表中BP指基于Beale-Powell restart的三项方法，其余方法见前述介绍；Time指CPU时间，niter为迭代轮数，feval、geval和Geval分别指愿函数、一阶导数及hessian矩阵的计算次数。$\epsilon=1e-8$。}
-  \label{tab:rastrigin}
+  \caption{在初始点上施加不同大小的随机噪声后，大、小剩余量方法的数值表现对比。其中所有噪声均取自期望为0的正态分布，Noise Scale代表正态分布的标准差（特别的，Scale=0时代表不增加噪声），GN-Small/Large分别指小、大剩余量的Gauss-Newton方法，Time指CPU时间，niter为迭代轮数，feval分别Jeval分别指剩余函数（向量）和最小二乘问题的Jacobi矩阵的计算次数，$||g^*||$为所有最小二乘目标函数在收敛点的导数范数。$\epsilon=1e-6$。}
+  \label{tab:noise}
 \end{table*}
 
+根据表\ref{tab:noise}可做如下分析：
+\begin{itemize}
+  \item 对应Gauss-Newton方法，噪声的确会显著影响其收敛速度，且随着噪声幅度的增大收敛变得越来越慢，这一方面表明了线搜索型方法解最小二乘问题对初始值的敏感性，另一方面也提示我们寻找一个好的初始值是实现高效求解的第一步。
+  \item 在不存在噪声时，小剩余量方法显著优于大剩余量方法，但当噪声逐渐增加，后者逐渐超越前者，且后者相对前者的优势随噪声的增大而扩大。由于噪声的大小即一定程度上反映了初始点上的剩余量大小，这一结论可以说明：当初始剩余量更大时，考虑$S_k$项的大剩余量方法具有相对优势；但当初始剩余量很小时，小剩余量GN方法本身已经是较好的近似，可以实现相对高效的收敛；这一结论与大剩余量方法提出的初衷相吻合。
+\end{itemize}
+
+\subsection{ODR方法的分析}
+由于ODR方法可化为特殊的最小二乘问题并通过信赖域方法求解，我们分别基于单折与双折Dogleg方法进行数值实验，结果如表\ref{tab:overall}的第5、6行所示。对此我们做出如下讨论：
+\begin{itemize}
+  \item 即便加入了计算Jacobi矩阵时的性能优化，ODR方法由于更多更复杂的剩余函数形式，在耗时和所需迭代次数上仍高于相同设定下的原始信赖域方法。
+  \item 在ODR方法内部，使用双折Dogleg方法仍相较单折Dogleg具有一定的效率优势，但这种优势并不显著，实际应用中二者的选择或许不会对数值表现有决定性影响。
+  \item 虽然ODR方法引入的复杂性一定程度上降低了运行效率，但它引入的额外参数使得模型能更好地拟合数据样本，这体现在其收敛的目标函数值$f(x^*)$低于同样设定下信赖域方法求解原始最小二乘问题的目标函数值。在这种意义上，ODR方法可以对样本数据有更强的拟合能力。
+\end{itemize}
 
 \section{总结}
-本文比较了几种拟Newton方法与共轭梯度方法在多个测试函数上的数值表现，分析了二者的优劣；总体而言，拟牛顿法精度好于共轭梯度法，这说明后者对非正定二次函数的泛化表现并不令人满意；L-BFGS相比BFGS实现了显著的性能提升；Beale-Powell三项方法在共轭梯度法中表现相对更优。
+本文讨论最小二乘问题上的多种最优化算法，包括大、小剩余量的Gauss-Newton方法，基于单折与双折Dogleg的信赖与方法，ODR方法。本文通过Osborne数据拟合问题比较了上述方法的数值表现并进行分析，通过引入额外噪声的实验进一步分析大剩余方法的意义。
 
 
 %end{CJK*}
